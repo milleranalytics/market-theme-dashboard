@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { marketGroups } from "../../data";
+import { allSymbols } from "../../data";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function GET() {
     });
   }
 
-  const symbols = marketGroups.map((group) => group.symbol).join(",");
+  const symbols = allSymbols.join(",");
   const url = new URL("https://data.alpaca.markets/v2/stocks/snapshots");
   url.searchParams.set("symbols", symbols);
   url.searchParams.set("feed", feed);

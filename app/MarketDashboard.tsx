@@ -121,7 +121,20 @@ export function MarketDashboard() {
   const advancers = ranked.filter((group) => valueFor(group) > 0).length;
   const leader = ranked[0];
   const laggard = ranked[ranked.length - 1];
-  const selectedHoldings = [...selected.holdings].sort((a, b) => b.rs - a.rs);
+  const liveUniverse = Object.values(liveChanges).sort((a, b) => a - b);
+  const liveRs = (symbol: string, fallback: number) => {
+    const value = liveChanges[symbol];
+    if (provider !== "alpaca" || value === undefined || liveUniverse.length < 2) return fallback;
+    const below = liveUniverse.filter((item) => item < value).length;
+    return Math.max(1, Math.min(99, Math.round((below / (liveUniverse.length - 1)) * 98 + 1)));
+  };
+  const selectedHoldings = selected.holdings
+    .map((holding) => ({
+      ...holding,
+      today: provider === "alpaca" && liveChanges[holding.symbol] !== undefined ? liveChanges[holding.symbol] : holding.today,
+      rs: liveRs(holding.symbol, holding.rs),
+    }))
+    .sort((a, b) => b.rs - a.rs);
 
   return (
     <main className="app-shell">

@@ -151,9 +151,14 @@ export function MarketDashboard() {
 
   const selected = marketGroups.find((group) => group.symbol === selectedSymbol) ?? ranked[0] ?? marketGroups[0];
   const maxAbs = Math.max(...ranked.map((group) => Math.abs(valueFor(group))), 1);
-  const advancers = ranked.filter((group) => valueFor(group) > 0).length;
+  const sectorAdvancers = ranked.filter((group) => valueFor(group) > 0).length;
   const leader = ranked[0];
   const laggard = ranked[ranked.length - 1];
+  const etfSymbols = new Set(marketGroups.map((group) => group.symbol));
+  const stockUniverse = Array.from(new Set([...Object.keys(historyReturns), ...Object.keys(liveChanges)]))
+    .filter((symbol) => !etfSymbols.has(symbol) && returnFor(symbol, period) !== undefined);
+  const stockAdvancers = stockUniverse.filter((symbol) => returnFor(symbol, period)! > 0).length;
+  const stockBreadth = stockUniverse.length ? (stockAdvancers / stockUniverse.length) * 100 : 0;
   const fullHoldings = issuerHoldings?.etf === selected.symbol ? issuerHoldings.holdings
     .filter((holding) => holding.symbol && (Object.keys(historyReturns).length === 0 || historyReturns[holding.symbol] !== undefined || liveChanges[holding.symbol] !== undefined))
     .map((holding) => {
@@ -162,6 +167,11 @@ export function MarketDashboard() {
     }) : [];
   const visibleHoldings = showAllHoldings ? fullHoldings : fullHoldings.slice(0, 12);
   const pricedWeight = fullHoldings.reduce((sum, holding) => sum + (holding.today === undefined ? 0 : holding.weight), 0);
+  const fundPriced = fullHoldings.filter((holding) => holding.today !== undefined);
+  const fundAdvancers = fundPriced.filter((holding) => holding.today! > 0);
+  const fundStockBreadth = fundPriced.length ? (fundAdvancers.length / fundPriced.length) * 100 : 0;
+  const fundAdvancingWeight = fundAdvancers.reduce((sum, holding) => sum + holding.weight, 0);
+  const fundWeightBreadth = pricedWeight ? (fundAdvancingWeight / pricedWeight) * 100 : 0;
 
   return (
     <main className="app-shell">
@@ -196,10 +206,11 @@ export function MarketDashboard() {
             <b>{leader ? formatPercent(valueFor(leader)) : "—"}</b>
           </article>
           <article className="summary-card">
-            <span>Positive breadth</span>
-            <strong>{ranked.length ? Math.round((advancers / ranked.length) * 100) : 0}%</strong>
-            <em>{advancers} of {ranked.length} groups rising</em>
-            <div className="mini-meter"><i style={{ width: `${ranked.length ? (advancers / ranked.length) * 100 : 0}%` }} /></div>
+            <span>Stock breadth · {periods.find((item) => item.key === period)?.label}</span>
+            <strong>{stockUniverse.length ? `${Math.round(stockBreadth)}%` : "—"}</strong>
+            <em>{stockUniverse.length ? `${stockAdvancers} of ${stockUniverse.length} stocks rising` : "Loading stock participation"}</em>
+            <small>{sectorAdvancers} of {ranked.length} sectors rising</small>
+            <div className="mini-meter"><i style={{ width: `${stockBreadth}%` }} /></div>
           </article>
           <article className="summary-card laggard-card">
             <span>Laggard</span>
@@ -283,6 +294,14 @@ export function MarketDashboard() {
             <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}</strong></div>
             <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
             <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
+          </div>
+          <div className="fund-breadth">
+            <div className="fund-breadth-copy">
+              <span>Fund breadth · {periods.find((item) => item.key === period)?.label}</span>
+              <strong>{fundPriced.length ? `${fundAdvancers.length} of ${fundPriced.length} stocks advancing` : "Loading participation"}</strong>
+            </div>
+            <div className="breadth-stat"><span>Stocks</span><strong>{fundPriced.length ? `${Math.round(fundStockBreadth)}%` : "—"}</strong></div>
+            <div className="breadth-stat"><span>Weight</span><strong>{pricedWeight ? `${Math.round(fundWeightBreadth)}%` : "—"}</strong></div>
           </div>
           <div className="holdings-list">
             {holdingsLoading && <div className="holdings-state">Refreshing official holdings…</div>}

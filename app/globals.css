@@ -127,6 +127,7 @@ button { color: inherit; }
 .summary-card span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
 .summary-card strong { font: 650 27px/1 var(--font-geist-mono), monospace; margin-top: 21px; }
 .summary-card em { color: var(--muted); font-style: normal; font-size: 11px; margin-top: 6px; }
+.summary-card small { color: var(--dim); font-size: 9px; margin-top: 5px; }
 .summary-card b { margin-top: auto; font: 600 13px/1 var(--font-geist-mono), monospace; }
 .leader-card b { color: var(--positive); }
 .laggard-card b { color: var(--negative); }
@@ -203,6 +204,11 @@ button { color: inherit; }
 .holdings-provenance span,.holdings-provenance strong { display: block; }
 .holdings-provenance span { color: var(--dim); text-transform: uppercase; letter-spacing: .09em; font-size: 7px; }
 .holdings-provenance strong { margin-top: 4px; font: 600 9px/1.2 var(--font-geist-mono),monospace; }
+.fund-breadth { display:grid; grid-template-columns:1fr 72px 72px; align-items:center; gap:8px; padding:13px 18px; border-top:1px solid var(--border-soft); background:linear-gradient(90deg,rgba(87,230,177,.055),transparent); }
+.fund-breadth-copy span,.breadth-stat span { display:block; color:var(--dim); text-transform:uppercase; letter-spacing:.09em; font-size:7px; }
+.fund-breadth-copy strong { display:block; margin-top:5px; font-size:10px; }
+.breadth-stat { text-align:right; }
+.breadth-stat strong { display:block; margin-top:5px; color:var(--positive); font:650 13px/1 var(--font-geist-mono),monospace; }
 .holding-row { min-height: 56px; padding: 9px 18px; border-bottom: 1px solid var(--border-soft); display: grid; grid-template-columns: 27px minmax(110px, 1fr) 82px 56px 58px; gap: 8px; align-items: center; }
 .holding-row.expanded { grid-template-columns: 27px minmax(105px,1fr) 74px 48px 55px 48px; }
 .muted-value { color: var(--dim); text-align: right; font: 600 9px/1 var(--font-geist-mono),monospace; }
@@ -254,6 +260,7 @@ footer { display: flex; justify-content: space-between; padding: 23px 4px 0; col
   .holding-row.expanded { grid-template-columns: 23px minmax(95px,1fr) 48px 48px; }
   .holding-row.expanded .holding-weight,.holding-row.expanded .rs-pending,.holding-row.expanded .strength-badge { display:none; }
   .holdings-provenance { grid-template-columns: repeat(2,1fr); }
+  .fund-breadth { grid-template-columns:1fr 58px 58px; }
   .holding-weight { display: none; }
   .period-strip { overflow-x: auto; }
   footer { gap: 14px; flex-direction: column; }

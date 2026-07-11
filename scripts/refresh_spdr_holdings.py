@@ -35,10 +35,11 @@ def refresh(symbol: str) -> dict:
     holdings = []
     for row in rows[5:]:
         name, ticker, identifier, sedol, weight, sector, shares, currency = row[:8]
-        if not name or not isinstance(weight, (int, float)) or weight < 0 or weight > 100:
+        ticker = clean(ticker)
+        if not name or not ticker or not isinstance(weight, (int, float)) or weight <= 0 or weight > 100:
             continue
         holdings.append({
-            "name": clean(name), "symbol": clean(ticker), "identifier": clean(identifier),
+            "name": clean(name), "symbol": ticker, "identifier": clean(identifier),
             "sedol": clean(sedol), "weight": weight, "sector": clean(sector),
             "shares": shares if isinstance(shares, (int, float)) else None, "currency": clean(currency),
         })

@@ -12,6 +12,7 @@ type LiveResponse = {
   reason?: string;
 };
 type HoldingsResponse = { etf: string; issuer: string; effectiveDate: string; fetchedAt: string; totalWeight: number; holdings: Array<{ name: string; symbol: string | null; weight: number; shares: number | null; currency: string | null }> };
+type HistoryResponse = { provider: "alpaca"; asOf: string; returns: Record<string, { "1w": number; "1m": number; "3m": number; ytd: number }>; rs: Record<string, number> };
 
 const formatPercent = (value: number, digits = 2) =>
   `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
@@ -79,6 +80,8 @@ export function MarketDashboard() {
   const [feed, setFeed] = useState<string>("demo");
   const [asOf, setAsOf] = useState<string | null>(null);
   const [marketReason, setMarketReason] = useState<string | null>(null);
+  const [historyReturns, setHistoryReturns] = useState<HistoryResponse["returns"]>({});
+  const [rsScores, setRsScores] = useState<Record<string, number>>({});
   const [issuerHoldings, setIssuerHoldings] = useState<HoldingsResponse | null>(null);
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [holdingsLoading, setHoldingsLoading] = useState(false);
@@ -111,6 +114,15 @@ export function MarketDashboard() {
 
   useEffect(() => {
     let active = true;
+    fetch("/api/history", { cache: "no-store" })
+      .then(async (response) => { if (!response.ok) throw new Error("History unavailable"); return response.json() as Promise<HistoryResponse>; })
+      .then((payload) => { if (active) { setHistoryReturns(payload.returns ?? {}); setRsScores(payload.rs ?? {}); } })
+      .catch(() => { if (active) { setHistoryReturns({}); setRsScores({}); } });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     setHoldingsLoading(true); setHoldingsError(null); setShowAllHoldings(false);
     fetch(`/api/holdings?symbol=${selectedSymbol}`, { cache: "no-store" })
       .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Holdings unavailable"); return body as HoldingsResponse; })
@@ -120,10 +132,10 @@ export function MarketDashboard() {
     return () => { active = false; };
   }, [selectedSymbol]);
 
-  const valueFor = (group: MarketGroup) =>
-    period === "today" && liveChanges[group.symbol] !== undefined
-      ? liveChanges[group.symbol]
-      : group.returns[period];
+  const returnFor = (symbol: string, selectedPeriod: PeriodKey) => selectedPeriod === "today"
+    ? liveChanges[symbol]
+    : historyReturns[symbol]?.[selectedPeriod];
+  const valueFor = (group: MarketGroup) => returnFor(group.symbol, period) ?? 0;
 
   const ranked = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -135,7 +147,7 @@ export function MarketDashboard() {
       .sort((a, b) => valueFor(b) - valueFor(a));
     // liveChanges intentionally participates in ranking.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, query, period, liveChanges]);
+  }, [filter, query, period, liveChanges, historyReturns]);
 
   const selected = marketGroups.find((group) => group.symbol === selectedSymbol) ?? ranked[0] ?? marketGroups[0];
   const maxAbs = Math.max(...ranked.map((group) => Math.abs(valueFor(group))), 1);
@@ -143,8 +155,8 @@ export function MarketDashboard() {
   const leader = ranked[0];
   const laggard = ranked[ranked.length - 1];
   const fullHoldings = issuerHoldings?.etf === selected.symbol ? issuerHoldings.holdings.map((holding) => {
-    const today = holding.symbol ? liveChanges[holding.symbol] : undefined;
-    return { ...holding, today, rs: undefined as number | undefined, contribution: today === undefined ? undefined : holding.weight * today / 100 };
+    const holdingReturn = holding.symbol ? returnFor(holding.symbol, period) : undefined;
+    return { ...holding, today: holdingReturn, rs: holding.symbol ? rsScores[holding.symbol] : undefined, contribution: holdingReturn === undefined ? undefined : holding.weight * holdingReturn / 100 };
   }) : [];
   const visibleHoldings = showAllHoldings ? fullHoldings : fullHoldings.slice(0, 12);
   const pricedWeight = fullHoldings.reduce((sum, holding) => sum + (holding.today === undefined ? 0 : holding.weight), 0);
@@ -250,8 +262,8 @@ export function MarketDashboard() {
             {periods.map((item) => (
               <div key={item.key}>
                 <span>{item.label}</span>
-                <strong className={selected.returns[item.key] >= 0 ? "positive-text" : "negative-text"}>
-                  {formatPercent(item.key === "today" ? valueFor(selected) : selected.returns[item.key], 1)}
+                <strong className={(returnFor(selected.symbol, item.key) ?? 0) >= 0 ? "positive-text" : "negative-text"}>
+                  {returnFor(selected.symbol, item.key) === undefined ? "—" : formatPercent(returnFor(selected.symbol, item.key)!, 1)}
                 </strong>
               </div>
             ))}

@@ -44,11 +44,12 @@ export function parseSpdrWorkbook(buffer: ArrayBuffer, fund: EtfDefinition): Hol
   }
   const holdings = rows.slice(5).flatMap((row) => {
     const name = text(row[0]);
+    const symbol = text(row[1]);
     const weight = number(row[4]);
-    if (!name || weight === null || weight < 0 || weight > 100) return [];
+    if (!name || !symbol || weight === null || weight <= 0 || weight > 100) return [];
     return [{
       name,
-      symbol: text(row[1]),
+      symbol,
       identifier: text(row[2]),
       sedol: text(row[3]),
       weight,

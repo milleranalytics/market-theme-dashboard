@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import snapshots from "../../generated/spdr-holdings.json";
+import { getLatestHoldingsSnapshots } from "../../lib/holdings-snapshot";
 import { etfUniverse } from "../../universe";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +24,10 @@ export async function GET() {
     });
   }
 
+  const snapshotResult = await getLatestHoldingsSnapshots();
   const symbols = Array.from(new Set([
     ...etfUniverse.map((fund) => fund.symbol),
-    ...Object.values(snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
+    ...Object.values(snapshotResult.snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
   ]));
 
   const changes: Record<string, number> = {};
@@ -71,6 +72,6 @@ export async function GET() {
     reason: provider === "demo" ? errors[0]?.code ?? "alpaca_empty_response" : errors.length ? "alpaca_partial_response" : undefined,
     asOf: new Date().toISOString(),
     changes,
-    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors },
+    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors, holdingsDelivery: snapshotResult.delivery },
   });
 }

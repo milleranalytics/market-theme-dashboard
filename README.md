@@ -1,98 +1,67 @@
-# vinext-starter
+# Market Sector Strength Dashboard
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Rotation is a research dashboard for the 11 Select Sector SPDR ETFs. It ranks sector performance, shows each fund's complete equity portfolio, estimates each holding's contribution to the selected-period return, measures breadth, and calculates longer-term relative-strength percentiles.
 
-## Prerequisites
+## Data architecture
 
-- Node.js `>=22.13.0`
+- **ETF universe:** the 11 Select Sector SPDR funds defined in `app/universe.ts`.
+- **Holdings:** official State Street daily XLSX workbooks. A scheduled GitHub Action downloads, normalizes, validates, and commits `app/generated/spdr-holdings.json` on weekdays.
+- **Prices:** Alpaca Market Data, using the IEX feed by default.
+- **Historical returns:** adjusted Alpaca daily bars for 1W, 1M, 3M, and YTD.
+- **Relative strength:** percentile rank from 1–99 across the tracked constituent universe using `0.4 × P(63) + 0.2 × P(126) + 0.2 × P(189) + 0.2 × P(252)`.
 
-## Quick Start
+The hosted app checks the GitHub holdings snapshot every six hours. If it cannot reach GitHub or the snapshot fails validation, it uses the validated snapshot bundled with the deployment and displays a warning. The hidden `/data-health` route documents the sources and exposes normalized fund responses for debugging.
+
+## Automated holdings refresh
+
+`.github/workflows/refresh-spdr-holdings.yml` runs at 23:30 UTC Monday through Friday and can also be started manually. The workflow:
+
+1. Downloads all 11 issuer workbooks.
+2. Keeps valid positive-weight holdings and normalizes their fields.
+3. Rejects incomplete or implausible fund data.
+4. Commits a changed snapshot back to `main`.
+
+GitHub Actions must be enabled for the repository and the workflow must have permission to write repository contents.
+
+## Local development
+
+Requires Node.js 22.13 or newer and Python 3.12+ for the holdings refresh script.
 
 ```bash
 npm install
+copy .env.example .env.local
 npm run dev
+```
+
+Add your Alpaca credentials to `.env.local`. Never commit that file.
+
+```text
+APCA_API_KEY_ID=your_alpaca_key_id
+APCA_API_SECRET_KEY=your_alpaca_secret_key
+ALPACA_FEED=iex
+```
+
+Build and test with:
+
+```bash
 npm run build
+node --test tests/rendered-html.test.mjs
 ```
 
-This starter does not use `wrangler.jsonc`.
+To refresh holdings locally:
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+python -m pip install openpyxl
+python scripts/refresh_spdr_holdings.py
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+## Methodology notes
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+- Contribution is current portfolio weight multiplied by the selected-period stock return. For historical periods it is an attribution estimate because it uses today's weight, not the historical weight path.
+- Stock breadth is the share of unique priced constituents with a positive return for the selected period.
+- Fund breadth includes both equal-weight stock participation and the share of priced portfolio weight advancing.
+- The dashboard is a research prototype, not investment advice or an execution system.
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+## Hosting
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+The application is hosted privately with OpenAI Sites. GitHub is the canonical source and runs the scheduled holdings update; Sites continues to provide the hosted application and stores its Alpaca secrets separately.

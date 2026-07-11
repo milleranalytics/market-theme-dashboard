@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import snapshots from "../../generated/spdr-holdings.json";
+import { getLatestHoldingsSnapshots } from "../../lib/holdings-snapshot";
 import { etfUniverse } from "../../universe";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +18,10 @@ export async function GET() {
   const feed = process.env.ALPACA_FEED ?? "iex";
   if (!key || !secret) return NextResponse.json({ provider: "unavailable", reason: "alpaca_credentials_missing" }, { status: 503 });
 
+  const snapshotResult = await getLatestHoldingsSnapshots();
   const symbols = Array.from(new Set([
     ...etfUniverse.map((fund) => fund.symbol),
-    ...Object.values(snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
+    ...Object.values(snapshotResult.snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
   ]));
   const barsBySymbol: Record<string, Bar[]> = {};
   const unsupported = new Set<string>();
@@ -77,6 +78,6 @@ export async function GET() {
   scores.forEach(([symbol], index) => { rs[symbol] = scores.length < 2 ? 50 : Math.round(1 + (index / (scores.length - 1)) * 98); });
 
   return NextResponse.json({ provider: "alpaca", feed, asOf: new Date().toISOString(), returns, rs,
-    diagnostics: { requestedSymbols: symbols.length, historySymbols: Object.keys(barsBySymbol).length, rsPopulation: scores.length, unsupportedSymbols: [...unsupported] } },
+    diagnostics: { requestedSymbols: symbols.length, historySymbols: Object.keys(barsBySymbol).length, rsPopulation: scores.length, unsupportedSymbols: [...unsupported], holdingsDelivery: snapshotResult.delivery } },
     { headers: { "Cache-Control": "private, max-age=0, s-maxage=21600, stale-while-revalidate=86400" } });
 }

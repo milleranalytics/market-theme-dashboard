@@ -11,7 +11,7 @@ type LiveResponse = {
   changes: Record<string, number>;
   reason?: string;
 };
-type HoldingsResponse = { etf: string; issuer: string; effectiveDate: string; fetchedAt: string; totalWeight: number; holdings: Array<{ name: string; symbol: string | null; weight: number; shares: number | null; currency: string | null }> };
+type HoldingsResponse = { etf: string; issuer: string; effectiveDate: string; fetchedAt: string; totalWeight: number; delivery?: "github-automated-snapshot" | "bundled-fallback"; refreshWarning?: string; holdings: Array<{ name: string; symbol: string | null; weight: number; shares: number | null; currency: string | null }> };
 type HistoryResponse = { provider: "alpaca"; asOf: string; returns: Record<string, { "1w": number; "1m": number; "3m": number; ytd: number }>; rs: Record<string, number> };
 
 const formatPercent = (value: number, digits = 2) =>
@@ -28,6 +28,21 @@ const formatTime = (value: string | null) => {
         hour: "numeric",
         minute: "2-digit",
       }).format(date);
+};
+
+const businessDaysSince = (dateText?: string) => {
+  if (!dateText) return 0;
+  const cursor = new Date(`${dateText}T12:00:00Z`);
+  if (Number.isNaN(cursor.getTime())) return 0;
+  const today = new Date();
+  let count = 0;
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  while (cursor <= today) {
+    const day = cursor.getUTCDay();
+    if (day !== 0 && day !== 6) count += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
 };
 
 function StrengthBadge({ value }: { value: number }) {
@@ -172,6 +187,7 @@ export function MarketDashboard() {
   const fundStockBreadth = fundPriced.length ? (fundAdvancers.length / fundPriced.length) * 100 : 0;
   const fundAdvancingWeight = fundAdvancers.reduce((sum, holding) => sum + holding.weight, 0);
   const fundWeightBreadth = pricedWeight ? (fundAdvancingWeight / pricedWeight) * 100 : 0;
+  const holdingsAge = businessDaysSince(issuerHoldings?.effectiveDate);
 
   return (
     <main className="app-shell">
@@ -287,11 +303,11 @@ export function MarketDashboard() {
               <p className="section-kicker">Inside the move</p>
               <h4>Complete portfolio</h4>
             </div>
-            <span>{issuerHoldings ? `${issuerHoldings.holdings.length} positions` : "Issuer data"}</span>
+            <span>{issuerHoldings ? `${fullHoldings.length} stocks` : "Issuer data"}</span>
           </div>
           <div className="holdings-provenance">
             <div><span>Source</span><strong>{issuerHoldings?.issuer ?? "State Street"}</strong></div>
-            <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}</strong></div>
+            <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}{holdingsAge > 2 ? " · stale" : ""}</strong></div>
             <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
             <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
           </div>
@@ -306,6 +322,8 @@ export function MarketDashboard() {
           <div className="holdings-list">
             {holdingsLoading && <div className="holdings-state">Refreshing official holdings…</div>}
             {holdingsError && <div className="holdings-state error">Issuer refresh failed: {holdingsError}</div>}
+            {!holdingsLoading && issuerHoldings?.delivery === "bundled-fallback" && <div className="holdings-state error">Automated GitHub snapshot unavailable; showing the last bundled snapshot.</div>}
+            {!holdingsLoading && holdingsAge > 2 && <div className="holdings-state error">Holdings are {holdingsAge} business days old. Check the automated refresh on the data health page.</div>}
             {!holdingsLoading && visibleHoldings.map((holding, index) => (
               <div className="holding-row expanded" key={`${holding.symbol ?? holding.name}-${index}`}>
                 <span className="rank-number">{String(index + 1).padStart(2, "0")}</span>
@@ -327,7 +345,7 @@ export function MarketDashboard() {
 
           <div className="method-note">
             <span>Method</span>
-            <p>Contribution equals current portfolio weight × return. A dash means the price feed does not cover that position. Longer-term RS will replace prototype scores after the history cache is populated.</p>
+            <p>Contribution equals current portfolio weight × selected-period return. RS is the 1–99 percentile of the weighted 3, 6, 9 and 12-month return formula across the tracked stock universe.</p>
           </div>
         </aside>
       </section>

@@ -62,10 +62,10 @@ button { color: inherit; }
 }
 .brand-mark::after { content: ""; position: absolute; left: 50%; top: 7px; bottom: 7px; width: 1px; background: #58636c; }
 .brand-mark i { position: absolute; height: 3px; border-radius: 3px; }
-.brand-mark i:nth-child(1) { left: 50%; top: 9px; width: 7px; background: var(--positive); }
-.brand-mark i:nth-child(2) { left: 50%; top: 15px; width: 13px; background: linear-gradient(90deg,var(--positive-2),var(--positive)); }
-.brand-mark i:nth-child(3) { right: 50%; top: 21px; width: 13px; background: linear-gradient(90deg,var(--negative),var(--negative-2)); }
-.brand-mark i:nth-child(4) { right: 50%; top: 27px; width: 7px; background: var(--negative); }
+.brand-mark i:nth-child(1) { left: 50%; top: 9px; width: 13px; background: linear-gradient(90deg,var(--positive-2),var(--positive)); }
+.brand-mark i:nth-child(2) { left: 50%; top: 15px; width: 7px; background: var(--positive); }
+.brand-mark i:nth-child(3) { right: 50%; top: 21px; width: 7px; background: var(--negative); }
+.brand-mark i:nth-child(4) { right: 50%; top: 27px; width: 13px; background: linear-gradient(90deg,var(--negative),var(--negative-2)); }
 
 .eyebrow, .section-kicker {
   margin: 0 0 4px;

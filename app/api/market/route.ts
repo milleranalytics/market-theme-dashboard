@@ -30,10 +30,9 @@ export async function GET() {
   ]));
 
   const changes: Record<string, number> = {};
-  const errors: Array<{ batch: number; status: number; code: string }> = [];
+  const errors: Array<{ batch: number; status: number; code: string; symbols?: string[] }> = [];
   const batchSize = 100;
-  for (let offset = 0; offset < symbols.length; offset += batchSize) {
-    const batch = symbols.slice(offset, offset + batchSize);
+  const fetchBatch = async (batch: string[], batchNumber: number): Promise<void> => {
     const url = new URL("https://data.alpaca.markets/v2/stocks/snapshots");
     url.searchParams.set("symbols", batch.join(","));
     url.searchParams.set("feed", feed);
@@ -43,8 +42,14 @@ export async function GET() {
         cache: "no-store",
       });
       if (!response.ok) {
-        errors.push({ batch: Math.floor(offset / batchSize) + 1, status: response.status, code: `alpaca_http_${response.status}` });
-        continue;
+        if (response.status === 400 && batch.length > 1) {
+          const midpoint = Math.ceil(batch.length / 2);
+          await fetchBatch(batch.slice(0, midpoint), batchNumber);
+          await fetchBatch(batch.slice(midpoint), batchNumber);
+          return;
+        }
+        errors.push({ batch: batchNumber, status: response.status, code: `alpaca_http_${response.status}`, symbols: batch });
+        return;
       }
       const payload = (await response.json()) as Record<string, Snapshot>;
       for (const [symbol, snapshot] of Object.entries(payload)) {
@@ -53,8 +58,11 @@ export async function GET() {
         if (current && prior) changes[symbol] = ((current / prior) - 1) * 100;
       }
     } catch {
-      errors.push({ batch: Math.floor(offset / batchSize) + 1, status: 0, code: "alpaca_network_error" });
+      errors.push({ batch: batchNumber, status: 0, code: "alpaca_network_error", symbols: batch });
     }
+  };
+  for (let offset = 0; offset < symbols.length; offset += batchSize) {
+    await fetchBatch(symbols.slice(offset, offset + batchSize), Math.floor(offset / batchSize) + 1);
   }
   const provider = Object.keys(changes).length ? "alpaca" : "demo";
   return NextResponse.json({

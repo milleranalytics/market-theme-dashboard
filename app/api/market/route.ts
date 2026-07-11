@@ -27,29 +27,42 @@ export async function GET() {
   const symbols = Array.from(new Set([
     ...etfUniverse.map((fund) => fund.symbol),
     ...Object.values(snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
-  ])).join(",");
-  const url = new URL("https://data.alpaca.markets/v2/stocks/snapshots");
-  url.searchParams.set("symbols", symbols);
-  url.searchParams.set("feed", feed);
+  ]));
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "APCA-API-KEY-ID": key,
-        "APCA-API-SECRET-KEY": secret,
-      },
-      cache: "no-store",
-    });
-    if (!response.ok) throw new Error(`Alpaca returned ${response.status}`);
-    const snapshots = (await response.json()) as Record<string, Snapshot>;
-    const changes: Record<string, number> = {};
-    for (const [symbol, snapshot] of Object.entries(snapshots)) {
-      const current = snapshot.dailyBar?.c;
-      const prior = snapshot.prevDailyBar?.c;
-      if (current && prior) changes[symbol] = ((current / prior) - 1) * 100;
+  const changes: Record<string, number> = {};
+  const errors: Array<{ batch: number; status: number; code: string }> = [];
+  const batchSize = 100;
+  for (let offset = 0; offset < symbols.length; offset += batchSize) {
+    const batch = symbols.slice(offset, offset + batchSize);
+    const url = new URL("https://data.alpaca.markets/v2/stocks/snapshots");
+    url.searchParams.set("symbols", batch.join(","));
+    url.searchParams.set("feed", feed);
+    try {
+      const response = await fetch(url, {
+        headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        errors.push({ batch: Math.floor(offset / batchSize) + 1, status: response.status, code: `alpaca_http_${response.status}` });
+        continue;
+      }
+      const payload = (await response.json()) as Record<string, Snapshot>;
+      for (const [symbol, snapshot] of Object.entries(payload)) {
+        const current = snapshot.dailyBar?.c;
+        const prior = snapshot.prevDailyBar?.c;
+        if (current && prior) changes[symbol] = ((current / prior) - 1) * 100;
+      }
+    } catch {
+      errors.push({ batch: Math.floor(offset / batchSize) + 1, status: 0, code: "alpaca_network_error" });
     }
-    return NextResponse.json({ provider: "alpaca", feed, asOf: new Date().toISOString(), changes });
-  } catch {
-    return NextResponse.json({ provider: "demo", feed: "demo", asOf: new Date().toISOString(), changes: {} });
   }
+  const provider = Object.keys(changes).length ? "alpaca" : "demo";
+  return NextResponse.json({
+    provider,
+    feed: provider === "alpaca" ? feed : "demo",
+    reason: provider === "demo" ? errors[0]?.code ?? "alpaca_empty_response" : errors.length ? "alpaca_partial_response" : undefined,
+    asOf: new Date().toISOString(),
+    changes,
+    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors },
+  });
 }

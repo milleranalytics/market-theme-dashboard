@@ -162,7 +162,7 @@ export function MarketDashboard() {
         <div className="status-block">
           <span className={`live-dot ${provider === "alpaca" ? "connected" : ""}`} />
           <div>
-            <strong>{provider === "alpaca" ? `Live via Alpaca · ${feed.toUpperCase()}` : marketReason === "alpaca_credentials_missing" ? "Prices unavailable · Alpaca key required" : "Market data unavailable"}</strong>
+            <strong>{provider === "alpaca" ? `Live via Alpaca · ${feed.toUpperCase()}` : marketReason === "alpaca_credentials_missing" ? "Prices unavailable · Alpaca key required" : `Market data unavailable${marketReason?.startsWith("alpaca_http_") ? ` · HTTP ${marketReason.slice(12)}` : ""}`}</strong>
             <span>Updated {formatTime(asOf)} · refreshes every 60 sec</span>
           </div>
         </div>

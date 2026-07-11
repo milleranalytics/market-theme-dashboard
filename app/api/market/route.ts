@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { allSymbols } from "../../data";
+import snapshots from "../../generated/spdr-holdings.json";
+import { etfUniverse } from "../../universe";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,16 @@ export async function GET() {
     return NextResponse.json({
       provider: "demo",
       feed: "demo",
+      reason: "alpaca_credentials_missing",
       asOf: new Date().toISOString(),
       changes: {},
     });
   }
 
-  const symbols = allSymbols.join(",");
+  const symbols = Array.from(new Set([
+    ...etfUniverse.map((fund) => fund.symbol),
+    ...Object.values(snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
+  ])).join(",");
   const url = new URL("https://data.alpaca.markets/v2/stocks/snapshots");
   url.searchParams.set("symbols", symbols);
   url.searchParams.set("feed", feed);

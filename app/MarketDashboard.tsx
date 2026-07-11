@@ -9,7 +9,9 @@ type LiveResponse = {
   feed?: string;
   asOf: string;
   changes: Record<string, number>;
+  reason?: string;
 };
+type HoldingsResponse = { etf: string; issuer: string; effectiveDate: string; fetchedAt: string; totalWeight: number; holdings: Array<{ name: string; symbol: string | null; weight: number; shares: number | null; currency: string | null }> };
 
 const formatPercent = (value: number, digits = 2) =>
   `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
@@ -71,11 +73,16 @@ export function MarketDashboard() {
   const [period, setPeriod] = useState<PeriodKey>("today");
   const [filter, setFilter] = useState<FilterKey>("All");
   const [query, setQuery] = useState("");
-  const [selectedSymbol, setSelectedSymbol] = useState("SOXX");
+  const [selectedSymbol, setSelectedSymbol] = useState("XLK");
   const [liveChanges, setLiveChanges] = useState<Record<string, number>>({});
   const [provider, setProvider] = useState<"demo" | "alpaca">("demo");
   const [feed, setFeed] = useState<string>("demo");
   const [asOf, setAsOf] = useState<string | null>(null);
+  const [marketReason, setMarketReason] = useState<string | null>(null);
+  const [issuerHoldings, setIssuerHoldings] = useState<HoldingsResponse | null>(null);
+  const [holdingsError, setHoldingsError] = useState<string | null>(null);
+  const [holdingsLoading, setHoldingsLoading] = useState(false);
+  const [showAllHoldings, setShowAllHoldings] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -89,6 +96,7 @@ export function MarketDashboard() {
         setProvider(payload.provider);
         setFeed(payload.feed ?? payload.provider);
         setAsOf(payload.asOf);
+        setMarketReason(payload.reason ?? null);
       } catch {
         // The bundled demo data remains the explicit fallback.
       }
@@ -101,6 +109,17 @@ export function MarketDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setHoldingsLoading(true); setHoldingsError(null); setShowAllHoldings(false);
+    fetch(`/api/holdings?symbol=${selectedSymbol}`, { cache: "no-store" })
+      .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Holdings unavailable"); return body as HoldingsResponse; })
+      .then((body) => { if (active) setIssuerHoldings(body); })
+      .catch((error) => { if (active) { setIssuerHoldings(null); setHoldingsError(error.message); } })
+      .finally(() => { if (active) setHoldingsLoading(false); });
+    return () => { active = false; };
+  }, [selectedSymbol]);
+
   const valueFor = (group: MarketGroup) =>
     period === "today" && liveChanges[group.symbol] !== undefined
       ? liveChanges[group.symbol]
@@ -108,7 +127,9 @@ export function MarketDashboard() {
 
   const ranked = useMemo(() => {
     const normalized = query.trim().toLowerCase();
+    const spdr = new Set(["XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"]);
     return marketGroups
+      .filter((group) => spdr.has(group.symbol))
       .filter((group) => filter === "All" || group.type === filter)
       .filter((group) => !normalized || `${group.symbol} ${group.name}`.toLowerCase().includes(normalized))
       .sort((a, b) => valueFor(b) - valueFor(a));
@@ -121,20 +142,12 @@ export function MarketDashboard() {
   const advancers = ranked.filter((group) => valueFor(group) > 0).length;
   const leader = ranked[0];
   const laggard = ranked[ranked.length - 1];
-  const liveUniverse = Object.values(liveChanges).sort((a, b) => a - b);
-  const liveRs = (symbol: string, fallback: number) => {
-    const value = liveChanges[symbol];
-    if (provider !== "alpaca" || value === undefined || liveUniverse.length < 2) return fallback;
-    const below = liveUniverse.filter((item) => item < value).length;
-    return Math.max(1, Math.min(99, Math.round((below / (liveUniverse.length - 1)) * 98 + 1)));
-  };
-  const selectedHoldings = selected.holdings
-    .map((holding) => ({
-      ...holding,
-      today: provider === "alpaca" && liveChanges[holding.symbol] !== undefined ? liveChanges[holding.symbol] : holding.today,
-      rs: liveRs(holding.symbol, holding.rs),
-    }))
-    .sort((a, b) => b.rs - a.rs);
+  const fullHoldings = issuerHoldings?.etf === selected.symbol ? issuerHoldings.holdings.map((holding) => {
+    const today = holding.symbol ? liveChanges[holding.symbol] : undefined;
+    return { ...holding, today, rs: undefined as number | undefined, contribution: today === undefined ? undefined : holding.weight * today / 100 };
+  }) : [];
+  const visibleHoldings = showAllHoldings ? fullHoldings : fullHoldings.slice(0, 12);
+  const pricedWeight = fullHoldings.reduce((sum, holding) => sum + (holding.today === undefined ? 0 : holding.weight), 0);
 
   return (
     <main className="app-shell">
@@ -149,7 +162,7 @@ export function MarketDashboard() {
         <div className="status-block">
           <span className={`live-dot ${provider === "alpaca" ? "connected" : ""}`} />
           <div>
-            <strong>{provider === "alpaca" ? `Live via Alpaca · ${feed.toUpperCase()}` : "Demo data · Live-ready"}</strong>
+            <strong>{provider === "alpaca" ? `Live via Alpaca · ${feed.toUpperCase()}` : marketReason === "alpaca_credentials_missing" ? "Prices unavailable · Alpaca key required" : "Market data unavailable"}</strong>
             <span>Updated {formatTime(asOf)} · refreshes every 60 sec</span>
           </div>
         </div>
@@ -157,7 +170,7 @@ export function MarketDashboard() {
 
       <section className="hero-grid">
         <div className="hero-copy">
-          <p className="section-kicker">Sector & theme pulse</p>
+          <p className="section-kicker">Select Sector SPDR pulse</p>
           <h2>See leadership shift<br />before the story catches up.</h2>
           <p>ETF performance is the signal. Constituent relative strength shows whether the move is broad, narrow or breaking apart.</p>
         </div>
@@ -200,11 +213,7 @@ export function MarketDashboard() {
           </div>
 
           <div className="toolbar">
-            <div className="segmented" aria-label="Universe filter">
-              {(["All", "Sector", "Theme"] as FilterKey[]).map((item) => (
-                <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>
-              ))}
-            </div>
+            <div className="universe-chip">11 SPDR sector funds</div>
             <label className="search-box">
               <span>⌕</span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find ETF or theme" />
@@ -251,37 +260,47 @@ export function MarketDashboard() {
           <div className="holdings-heading">
             <div>
               <p className="section-kicker">Inside the move</p>
-              <h4>Constituent leaders</h4>
+              <h4>Complete portfolio</h4>
             </div>
-            <span>RS percentile</span>
+            <span>{issuerHoldings ? `${issuerHoldings.holdings.length} positions` : "Issuer data"}</span>
+          </div>
+          <div className="holdings-provenance">
+            <div><span>Source</span><strong>{issuerHoldings?.issuer ?? "State Street"}</strong></div>
+            <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}</strong></div>
+            <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
+            <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
           </div>
           <div className="holdings-list">
-            {selectedHoldings.map((holding, index) => (
-              <div className="holding-row" key={holding.symbol}>
+            {holdingsLoading && <div className="holdings-state">Refreshing official holdings…</div>}
+            {holdingsError && <div className="holdings-state error">Issuer refresh failed: {holdingsError}</div>}
+            {!holdingsLoading && visibleHoldings.map((holding, index) => (
+              <div className="holding-row expanded" key={`${holding.symbol ?? holding.name}-${index}`}>
                 <span className="rank-number">{String(index + 1).padStart(2, "0")}</span>
                 <div className="holding-company">
-                  <strong>{holding.symbol}</strong>
+                  <strong>{holding.symbol ?? "—"}</strong>
                   <span>{holding.name}</span>
                 </div>
                 <div className="holding-weight">
                   <span>{holding.weight.toFixed(1)}% wt</span>
                   <div><i style={{ width: `${Math.min(100, holding.weight * 5)}%` }} /></div>
                 </div>
-                <span className={holding.today >= 0 ? "positive-text" : "negative-text"}>{formatPercent(holding.today)}</span>
-                <StrengthBadge value={holding.rs} />
+                <span className={holding.today === undefined ? "muted-value" : holding.today >= 0 ? "positive-text" : "negative-text"}>{holding.today === undefined ? "—" : formatPercent(holding.today)}</span>
+                <span className={holding.contribution === undefined ? "muted-value" : holding.contribution >= 0 ? "positive-text" : "negative-text"}>{holding.contribution === undefined ? "—" : `${holding.contribution > 0 ? "+" : ""}${holding.contribution.toFixed(2)} pt`}</span>
+                {holding.rs === undefined ? <span className="rs-pending">RS —</span> : <StrengthBadge value={holding.rs} />}
               </div>
             ))}
           </div>
+          {fullHoldings.length > 12 && <button className="show-all" onClick={() => setShowAllHoldings((value) => !value)}>{showAllHoldings ? "Show top 12" : `Show all ${fullHoldings.length} positions`}</button>}
 
           <div className="method-note">
             <span>Method</span>
-            <p>ETF returns measure price leadership—not literal fund flows. RS ranks each holding against the tracked stock universe.</p>
+            <p>Contribution equals current portfolio weight × return. A dash means the price feed does not cover that position. Longer-term RS will replace prototype scores after the history cache is populated.</p>
           </div>
         </aside>
       </section>
       <footer>
         <span>Rotation dashboard · research prototype</span>
-        <span>Sector ETFs + curated thematic ETFs</span>
+        <span>11 Select Sector SPDR ETFs · official issuer holdings</span>
       </footer>
     </main>
   );

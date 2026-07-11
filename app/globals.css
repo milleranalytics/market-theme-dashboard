@@ -143,6 +143,7 @@ button { color: inherit; }
 .period-tabs button:hover, .segmented button:hover { color: var(--text); }
 .period-tabs button.active, .segmented button.active { color: var(--text); background: var(--surface-3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.03); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 0 24px 18px; gap: 16px; }
+.universe-chip { color: var(--accent); border: 1px solid rgba(139,214,255,.18); background: rgba(139,214,255,.055); border-radius: 8px; padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .search-box { width: min(230px, 42%); display: flex; align-items: center; gap: 8px; height: 36px; border: 1px solid var(--border); border-radius: 9px; padding: 0 10px; background: #0b1014; color: var(--dim); }
 .search-box input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 11px; }
 .search-box input::placeholder { color: var(--dim); }
@@ -196,7 +197,19 @@ button { color: inherit; }
 .holdings-heading h4 { margin: 0; font-size: 14px; }
 .holdings-heading > span { color: var(--dim); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
 .holdings-list { border-top: 1px solid var(--border-soft); }
+.holdings-provenance { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--border-soft); background: #0b1014; }
+.holdings-provenance div { padding: 10px 12px; border-right: 1px solid var(--border-soft); }
+.holdings-provenance div:last-child { border-right: 0; }
+.holdings-provenance span,.holdings-provenance strong { display: block; }
+.holdings-provenance span { color: var(--dim); text-transform: uppercase; letter-spacing: .09em; font-size: 7px; }
+.holdings-provenance strong { margin-top: 4px; font: 600 9px/1.2 var(--font-geist-mono),monospace; }
 .holding-row { min-height: 56px; padding: 9px 18px; border-bottom: 1px solid var(--border-soft); display: grid; grid-template-columns: 27px minmax(110px, 1fr) 82px 56px 58px; gap: 8px; align-items: center; }
+.holding-row.expanded { grid-template-columns: 27px minmax(105px,1fr) 74px 48px 55px 48px; }
+.muted-value { color: var(--dim); text-align: right; font: 600 9px/1 var(--font-geist-mono),monospace; }
+.rs-pending { justify-self:end;color:var(--dim);border:1px solid #29333c;border-radius:5px;padding:5px 6px;font:600 8px/1 var(--font-geist-mono),monospace; }
+.holdings-state { padding: 28px 20px; color: var(--muted); font-size: 11px; text-align: center; }
+.holdings-state.error { color: var(--negative); }
+.show-all { width: calc(100% - 34px); margin: 13px 17px 0; padding: 10px; color: var(--accent); background: #0b1014; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 10px; }
 .rank-number { color: var(--dim); font: 500 9px/1 var(--font-geist-mono), monospace; }
 .holding-company strong, .holding-company span { display: block; }
 .holding-company strong { font: 650 11px/1 var(--font-geist-mono), monospace; }
@@ -238,6 +251,9 @@ footer { display: flex; justify-content: space-between; padding: 23px 4px 0; col
   .group-row { grid-template-columns: 92px 1fr 57px; padding-left: 13px; padding-right: 11px; }
   .group-name { display: none; }
   .holding-row { grid-template-columns: 23px minmax(95px, 1fr) 46px 52px; }
+  .holding-row.expanded { grid-template-columns: 23px minmax(95px,1fr) 48px 48px; }
+  .holding-row.expanded .holding-weight,.holding-row.expanded .rs-pending,.holding-row.expanded .strength-badge { display:none; }
+  .holdings-provenance { grid-template-columns: repeat(2,1fr); }
   .holding-weight { display: none; }
   .period-strip { overflow-x: auto; }
   footer { gap: 14px; flex-direction: column; }

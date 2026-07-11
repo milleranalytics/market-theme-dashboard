@@ -21,7 +21,8 @@ test("server-renders the market rotation dashboard", async () => {
   assert.match(html, /<title>Rotation \| Market Theme Dashboard<\/title>/i);
   assert.match(html, /Sector &amp; theme pulse/i);
   assert.match(html, /What&#x27;s moving/i);
-  assert.match(html, /Constituent leaders/i);
+  assert.match(html, /Complete portfolio/i);
+  assert.match(html, /11 SPDR sector funds/i);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 

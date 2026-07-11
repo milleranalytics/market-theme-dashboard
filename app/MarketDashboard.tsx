@@ -154,10 +154,12 @@ export function MarketDashboard() {
   const advancers = ranked.filter((group) => valueFor(group) > 0).length;
   const leader = ranked[0];
   const laggard = ranked[ranked.length - 1];
-  const fullHoldings = issuerHoldings?.etf === selected.symbol ? issuerHoldings.holdings.map((holding) => {
+  const fullHoldings = issuerHoldings?.etf === selected.symbol ? issuerHoldings.holdings
+    .filter((holding) => holding.symbol && (Object.keys(historyReturns).length === 0 || historyReturns[holding.symbol] !== undefined || liveChanges[holding.symbol] !== undefined))
+    .map((holding) => {
     const holdingReturn = holding.symbol ? returnFor(holding.symbol, period) : undefined;
     return { ...holding, today: holdingReturn, rs: holding.symbol ? rsScores[holding.symbol] : undefined, contribution: holdingReturn === undefined ? undefined : holding.weight * holdingReturn / 100 };
-  }) : [];
+    }) : [];
   const visibleHoldings = showAllHoldings ? fullHoldings : fullHoldings.slice(0, 12);
   const pricedWeight = fullHoldings.reduce((sum, holding) => sum + (holding.today === undefined ? 0 : holding.weight), 0);
 

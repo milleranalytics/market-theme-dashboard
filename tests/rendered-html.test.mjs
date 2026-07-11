@@ -18,8 +18,9 @@ test("server-renders the market rotation dashboard", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /<title>Rotation \| Market Theme Dashboard<\/title>/i);
-  assert.match(html, /Sector &amp; theme pulse/i);
+  assert.match(html, /<title>Sector Rotation Monitor \| Market Intelligence<\/title>/i);
+  assert.match(html, /Sector Rotation Monitor/i);
+  assert.doesNotMatch(html, /See leadership shift/i);
   assert.match(html, /What&#x27;s moving/i);
   assert.match(html, /Complete portfolio/i);
   assert.match(html, /11 SPDR sector funds/i);
@@ -36,6 +37,6 @@ test("ships the live snapshot route and removes the starter preview", async () =
   assert.match(route, /APCA-API-KEY-ID/);
   assert.match(route, /provider: "demo"/);
   assert.match(page, /MarketDashboard/);
-  assert.match(layout, /Market Theme Dashboard/);
+  assert.match(layout, /Sector Rotation Monitor/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });

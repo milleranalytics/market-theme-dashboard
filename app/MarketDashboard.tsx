@@ -30,6 +30,14 @@ const formatTime = (value: string | null) => {
       }).format(date);
 };
 
+const formatCheckedTime = (value?: string) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+};
+
 const businessDaysSince = (dateText?: string) => {
   if (!dateText) return 0;
   const cursor = new Date(`${dateText}T12:00:00Z`);
@@ -193,10 +201,10 @@ export function MarketDashboard() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-block">
-          <div className="brand-mark"><span /></div>
+          <div className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></div>
           <div>
             <p className="eyebrow">Market intelligence</p>
-            <h1>Rotation</h1>
+            <h1>Sector Rotation Monitor</h1>
           </div>
         </div>
         <div className="status-block">
@@ -209,11 +217,6 @@ export function MarketDashboard() {
       </header>
 
       <section className="hero-grid">
-        <div className="hero-copy">
-          <p className="section-kicker">Select Sector SPDR pulse</p>
-          <h2>See leadership shift<br />before the story catches up.</h2>
-          <p>ETF performance is the signal. Constituent relative strength shows whether the move is broad, narrow or breaking apart.</p>
-        </div>
         <div className="summary-grid">
           <article className="summary-card leader-card">
             <span>Leader</span>
@@ -308,6 +311,7 @@ export function MarketDashboard() {
           <div className="holdings-provenance">
             <div><span>Source</span><strong>{issuerHoldings?.issuer ?? "State Street"}</strong></div>
             <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}{holdingsAge > 2 ? " · stale" : ""}</strong></div>
+            <div><span>Last checked</span><strong>{formatCheckedTime(issuerHoldings?.fetchedAt)}</strong></div>
             <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
             <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
           </div>
@@ -350,7 +354,7 @@ export function MarketDashboard() {
         </aside>
       </section>
       <footer>
-        <span>Rotation dashboard · research prototype</span>
+        <span>Sector Rotation Monitor · research prototype</span>
         <span>11 Select Sector SPDR ETFs · official issuer holdings</span>
       </footer>
     </main>

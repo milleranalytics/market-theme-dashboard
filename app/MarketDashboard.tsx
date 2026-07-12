@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { marketGroups, periods, type MarketGroup, type PeriodKey } from "./data";
+import packageMetadata from "../package.json";
 
 type FilterKey = "All" | "Sector" | "Theme";
 type LiveResponse = {
@@ -365,7 +366,7 @@ export function MarketDashboard() {
         </aside>
       </section>
       <footer>
-        <span>Sector Rotation Monitor · research prototype</span>
+        <span>Sector Rotation Monitor · v{packageMetadata.version}</span>
         <span>11 Select Sector SPDR ETFs · official issuer holdings</span>
       </footer>
     </main>

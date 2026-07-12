@@ -60,7 +60,11 @@ python scripts/refresh_spdr_holdings.py
 - Contribution is current portfolio weight multiplied by the selected-period stock return. For historical periods it is an attribution estimate because it uses today's weight, not the historical weight path.
 - Stock breadth is the share of unique priced constituents with a positive return for the selected period.
 - Fund breadth includes both equal-weight stock participation and the share of priced portfolio weight advancing.
-- The dashboard is a research prototype, not investment advice or an execution system.
+- The dashboard is a market research tool, not investment advice or an execution system.
+
+## Versioning
+
+The application version is maintained in `package.json` and displayed in the dashboard footer. Patch releases contain fixes, minor releases add compatible features, and major releases mark fundamental product or methodology changes.
 
 ## Hosting
 

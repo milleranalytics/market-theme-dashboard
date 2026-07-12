@@ -98,6 +98,7 @@ export function MarketDashboard() {
   const [filter, setFilter] = useState<FilterKey>("All");
   const [query, setQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState("XLK");
+  const [displayedSymbol, setDisplayedSymbol] = useState("XLK");
   const [liveChanges, setLiveChanges] = useState<Record<string, number>>({});
   const [provider, setProvider] = useState<"demo" | "alpaca">("demo");
   const [feed, setFeed] = useState<string>("demo");
@@ -105,7 +106,7 @@ export function MarketDashboard() {
   const [marketReason, setMarketReason] = useState<string | null>(null);
   const [historyReturns, setHistoryReturns] = useState<HistoryResponse["returns"]>({});
   const [rsScores, setRsScores] = useState<Record<string, number>>({});
-  const [issuerHoldings, setIssuerHoldings] = useState<HoldingsResponse | null>(null);
+  const [holdingsCache, setHoldingsCache] = useState<Record<string, HoldingsResponse>>({});
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [holdingsLoading, setHoldingsLoading] = useState(false);
   const [showAllHoldings, setShowAllHoldings] = useState(false);
@@ -146,14 +147,22 @@ export function MarketDashboard() {
 
   useEffect(() => {
     let active = true;
-    setHoldingsLoading(true); setHoldingsError(null); setShowAllHoldings(false);
+    setShowAllHoldings(false);
+    const cached = holdingsCache[selectedSymbol];
+    if (cached) {
+      setDisplayedSymbol(selectedSymbol);
+      setHoldingsLoading(false);
+      setHoldingsError(null);
+      return () => { active = false; };
+    }
+    setHoldingsLoading(true); setHoldingsError(null);
     fetch(`/api/holdings?symbol=${selectedSymbol}`, { cache: "no-store" })
       .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Holdings unavailable"); return body as HoldingsResponse; })
-      .then((body) => { if (active) setIssuerHoldings(body); })
-      .catch((error) => { if (active) { setIssuerHoldings(null); setHoldingsError(error.message); } })
+      .then((body) => { if (active) { setHoldingsCache((current) => ({ ...current, [selectedSymbol]: body })); setDisplayedSymbol(selectedSymbol); } })
+      .catch((error) => { if (active) setHoldingsError(error.message); })
       .finally(() => { if (active) setHoldingsLoading(false); });
     return () => { active = false; };
-  }, [selectedSymbol]);
+  }, [selectedSymbol, holdingsCache]);
 
   const returnFor = (symbol: string, selectedPeriod: PeriodKey) => selectedPeriod === "today"
     ? liveChanges[symbol]
@@ -172,7 +181,8 @@ export function MarketDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, query, period, liveChanges, historyReturns]);
 
-  const selected = marketGroups.find((group) => group.symbol === selectedSymbol) ?? ranked[0] ?? marketGroups[0];
+  const selected = marketGroups.find((group) => group.symbol === displayedSymbol) ?? ranked[0] ?? marketGroups[0];
+  const issuerHoldings = holdingsCache[displayedSymbol] ?? null;
   const maxAbs = Math.max(...ranked.map((group) => Math.abs(valueFor(group))), 1);
   const sectorAdvancers = ranked.filter((group) => valueFor(group) > 0).length;
   const leader = ranked[0];
@@ -272,14 +282,15 @@ export function MarketDashboard() {
                 group={group}
                 value={valueFor(group)}
                 maxAbs={maxAbs}
-                selected={selected.symbol === group.symbol}
+                selected={selectedSymbol === group.symbol}
                 onSelect={() => setSelectedSymbol(group.symbol)}
               />
             ))}
           </div>
         </section>
 
-        <aside className="detail-panel panel">
+        <aside className={`detail-panel panel ${holdingsLoading && issuerHoldings ? "refreshing" : ""}`}>
+          {holdingsLoading && issuerHoldings && <div className="detail-refresh-indicator">Updating {selectedSymbol}…</div>}
           <div className="detail-hero">
             <div className="detail-type">{selected.type}</div>
             <div className="detail-symbol-row">
@@ -324,11 +335,11 @@ export function MarketDashboard() {
             <div className="breadth-stat"><span>Weight</span><strong>{pricedWeight ? `${Math.round(fundWeightBreadth)}%` : "—"}</strong></div>
           </div>
           <div className="holdings-list">
-            {holdingsLoading && <div className="holdings-state">Refreshing official holdings…</div>}
+            {holdingsLoading && !issuerHoldings && <div className="holdings-state">Loading official holdings…</div>}
             {holdingsError && <div className="holdings-state error">Issuer refresh failed: {holdingsError}</div>}
             {!holdingsLoading && issuerHoldings?.delivery === "bundled-fallback" && <div className="holdings-state error">Automated GitHub snapshot unavailable; showing the last bundled snapshot.</div>}
             {!holdingsLoading && holdingsAge > 2 && <div className="holdings-state error">Holdings are {holdingsAge} business days old. Check the automated refresh on the data health page.</div>}
-            {!holdingsLoading && visibleHoldings.map((holding, index) => (
+            {visibleHoldings.map((holding, index) => (
               <div className="holding-row expanded" key={`${holding.symbol ?? holding.name}-${index}`}>
                 <span className="rank-number">{String(index + 1).padStart(2, "0")}</span>
                 <div className="holding-company">

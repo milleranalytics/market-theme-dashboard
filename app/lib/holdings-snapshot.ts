@@ -57,7 +57,7 @@ function validateSnapshots(value: unknown): HoldingsSnapshotMap {
 
 export async function getLatestHoldingsSnapshots(): Promise<SnapshotResult> {
   try {
-    const response = await fetch(GITHUB_SNAPSHOT_URL, { next: { revalidate: 21600 } });
+    const response = await fetch(GITHUB_SNAPSHOT_URL, { cache: "no-store" });
     if (!response.ok) throw new Error(`GitHub snapshot returned HTTP ${response.status}`);
     return {
       snapshots: validateSnapshots(await response.json()),
@@ -73,4 +73,3 @@ export async function getLatestHoldingsSnapshots(): Promise<SnapshotResult> {
     };
   }
 }
-

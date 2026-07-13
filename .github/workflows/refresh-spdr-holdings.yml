@@ -2,6 +2,9 @@ name: Refresh SPDR holdings
 
 on:
   schedule:
+    # 9:15 AM Central during daylight time; 8:15 AM during standard time.
+    - cron: "15 14 * * 1-5"
+    # 6:30 PM Central during daylight time; 5:30 PM during standard time.
     - cron: "30 23 * * 1-5"
   workflow_dispatch:
 

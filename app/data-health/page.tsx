@@ -22,10 +22,10 @@ export default function DataHealthPage() {
         <article><span>Price source</span><strong>Alpaca</strong><p>IEX by default; configured server-side</p></article>
       </section>
       <section className="source-panel">
-        <div className="source-heading"><div><p>Holdings ingestion</p><h2>Automated snapshot</h2></div><span>Weekdays · 6:30 PM CT</span></div>
+        <div className="source-heading"><div><p>Holdings ingestion</p><h2>Automated snapshot</h2></div><span>Weekdays · before open + after close</span></div>
         <div className="health-note">
           <strong>Delivery path</strong>
-          <span>GitHub downloads and validates the issuer files. The app checks the <a href={GITHUB_SNAPSHOT_URL}>latest normalized snapshot</a> every six hours and uses its bundled copy only if GitHub is unavailable.</span>
+          <span>GitHub downloads and validates the issuer files twice each weekday. The open dashboard checks the <a href={GITHUB_SNAPSHOT_URL}>latest normalized snapshot</a> every 15 minutes and uses its bundled copy only if GitHub is unavailable.</span>
         </div>
         <div className="source-list">
           {etfUniverse.map((fund) => (

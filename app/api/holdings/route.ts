@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   if (!snapshot) return NextResponse.json({ error: "Holdings unavailable", etf: symbol, sourceUrl: fund.sourceUrl }, { status: 502 });
   return NextResponse.json({
     ...snapshot,
+    checkedAt: new Date().toISOString(),
     delivery: result.delivery,
     snapshotUrl: result.snapshotUrl,
     refreshWarning: result.refreshWarning,

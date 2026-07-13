@@ -41,18 +41,18 @@ test("ships the live snapshot route and removes the starter preview", async () =
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });
 
-test("keeps holdings refresh status current and transparent", async () => {
-  const [dashboard, route, snapshotSource, workflow] = await Promise.all([
+test("keeps daily holdings diagnostics transparent but out of the data flow", async () => {
+  const [dashboard, snapshotSource, workflow] = await Promise.all([
     readFile(new URL("../app/MarketDashboard.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/holdings/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/holdings-snapshot.ts", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/refresh-spdr-holdings.yml", import.meta.url), "utf8"),
   ]);
-  assert.match(route, /checkedAt: new Date\(\)\.toISOString\(\)/);
   assert.match(snapshotSource, /cache: "no-store"/);
-  assert.match(dashboard, /window\.setInterval\(refresh, 15 \* 60_000\)/);
-  assert.match(dashboard, /Prices updated.*Holdings checked/s);
+  assert.doesNotMatch(dashboard, /window\.setInterval\(refresh, 15 \* 60_000\)/);
+  assert.match(dashboard, /Prices updated/);
+  assert.match(dashboard, /<span>Updated<\/span><strong>\{formatCheckedTime\(issuerHoldings\?\.fetchedAt\)\}<\/strong>/);
+  assert.ok(dashboard.indexOf('<div className="holdings-provenance">') > dashboard.indexOf('<div className="holdings-list">'));
   assert.doesNotMatch(dashboard, /<span>Updated \{formatTime\(asOf\)\}/);
-  assert.match(workflow, /cron: "15 14 \* \* 1-5"/);
+  assert.doesNotMatch(workflow, /cron: "15 14 \* \* 1-5"/);
   assert.match(workflow, /cron: "30 23 \* \* 1-5"/);
 });

@@ -10,11 +10,11 @@ Rotation is a research dashboard for the 11 Select Sector SPDR ETFs. It ranks se
 - **Historical returns:** adjusted Alpaca daily bars for 1W, 1M, 3M, and YTD.
 - **Relative strength:** percentile rank from 1–99 across the tracked constituent universe using `0.4 × P(63) + 0.2 × P(126) + 0.2 × P(189) + 0.2 × P(252)`.
 
-The hosted app checks the GitHub holdings snapshot when it opens and every 15 minutes while it remains open. If it cannot reach GitHub or the snapshot fails validation, it uses the validated snapshot bundled with the deployment and displays a warning. The hidden `/data-health` route documents the sources and exposes normalized fund responses for debugging.
+The hosted app checks the GitHub holdings snapshot when it opens. If it cannot reach GitHub or the snapshot fails validation, it uses the validated snapshot bundled with the deployment and displays a warning. The hidden `/data-health` route documents the sources and exposes normalized fund responses for debugging.
 
 ## Automated holdings refresh
 
-`.github/workflows/refresh-spdr-holdings.yml` runs at 14:15 UTC and 23:30 UTC Monday through Friday (before the U.S. market open and after the close) and can also be started manually. The workflow:
+`.github/workflows/refresh-spdr-holdings.yml` runs at 23:30 UTC Monday through Friday (after the U.S. market closes) and can also be started manually. The workflow:
 
 1. Downloads all 11 issuer workbooks.
 2. Keeps valid positive-weight holdings and normalizes their fields.

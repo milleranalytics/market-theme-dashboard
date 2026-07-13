@@ -12,7 +12,7 @@ type LiveResponse = {
   changes: Record<string, number>;
   reason?: string;
 };
-type HoldingsResponse = { etf: string; issuer: string; effectiveDate: string; fetchedAt: string; checkedAt: string; totalWeight: number; delivery?: "github-automated-snapshot" | "bundled-fallback"; refreshWarning?: string; holdings: Array<{ name: string; symbol: string | null; weight: number; shares: number | null; currency: string | null }> };
+type HoldingsResponse = { etf: string; issuer: string; effectiveDate: string; fetchedAt: string; totalWeight: number; delivery?: "github-automated-snapshot" | "bundled-fallback"; refreshWarning?: string; holdings: Array<{ name: string; symbol: string | null; weight: number; shares: number | null; currency: string | null }> };
 type HistoryResponse = { provider: "alpaca"; asOf: string; returns: Record<string, { "1w": number; "1m": number; "3m": number; ytd: number }>; rs: Record<string, number> };
 
 const formatPercent = (value: number, digits = 2) =>
@@ -152,21 +152,18 @@ export function MarketDashboard() {
     const cached = holdingsCache[selectedSymbol];
     if (cached) {
       setDisplayedSymbol(selectedSymbol);
+      setHoldingsLoading(false);
+      setHoldingsError(null);
+      return () => { active = false; };
     }
-    const refresh = () => {
-      setHoldingsLoading(true); setHoldingsError(null);
-      fetch(`/api/holdings?symbol=${selectedSymbol}`, { cache: "no-store" })
-        .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Holdings unavailable"); return body as HoldingsResponse; })
-        .then((body) => { if (active) { setHoldingsCache((current) => ({ ...current, [selectedSymbol]: body })); setDisplayedSymbol(selectedSymbol); } })
-        .catch((error) => { if (active) setHoldingsError(error.message); })
-        .finally(() => { if (active) setHoldingsLoading(false); });
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 15 * 60_000);
-    return () => { active = false; window.clearInterval(timer); };
-    // The selected fund controls this refresh cycle; cache updates must not restart it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSymbol]);
+    setHoldingsLoading(true); setHoldingsError(null);
+    fetch(`/api/holdings?symbol=${selectedSymbol}`, { cache: "no-store" })
+      .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Holdings unavailable"); return body as HoldingsResponse; })
+      .then((body) => { if (active) { setHoldingsCache((current) => ({ ...current, [selectedSymbol]: body })); setDisplayedSymbol(selectedSymbol); } })
+      .catch((error) => { if (active) setHoldingsError(error.message); })
+      .finally(() => { if (active) setHoldingsLoading(false); });
+    return () => { active = false; };
+  }, [selectedSymbol, holdingsCache]);
 
   const returnFor = (symbol: string, selectedPeriod: PeriodKey) => selectedPeriod === "today"
     ? liveChanges[symbol]
@@ -320,12 +317,6 @@ export function MarketDashboard() {
             </div>
             <span>{issuerHoldings ? `${fullHoldings.length} stocks` : "Issuer data"}</span>
           </div>
-          <div className="holdings-provenance four-column">
-            <div><span>Source</span><strong>{issuerHoldings?.issuer ?? "State Street"}</strong></div>
-            <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}{holdingsAge > 2 ? " · stale" : ""}</strong></div>
-            <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
-            <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
-          </div>
           <div className="fund-breadth">
             <div className="fund-breadth-copy">
               <span>Fund breadth · {periods.find((item) => item.key === period)?.label}</span>
@@ -362,8 +353,15 @@ export function MarketDashboard() {
             <span>Method</span>
             <div>
               <p>Contribution equals current portfolio weight × selected-period return. RS is the 1–99 percentile of the weighted 3, 6, 9 and 12-month return formula across the tracked stock universe.</p>
-              <p className="data-debug">Prices updated {formatTime(asOf)} · refresh every 60 sec<br />Holdings checked {formatCheckedTime(issuerHoldings?.checkedAt)} · refresh every 15 min · issuer snapshot retrieved {formatCheckedTime(issuerHoldings?.fetchedAt)}</p>
+              <p className="data-debug">Prices updated {formatTime(asOf)} · refresh every 60 sec</p>
             </div>
+          </div>
+          <div className="holdings-provenance">
+            <div><span>Source</span><strong>{issuerHoldings?.issuer ?? "State Street"}</strong></div>
+            <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}{holdingsAge > 2 ? " · stale" : ""}</strong></div>
+            <div><span>Updated</span><strong>{formatCheckedTime(issuerHoldings?.fetchedAt)}</strong></div>
+            <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
+            <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
           </div>
         </aside>
       </section>

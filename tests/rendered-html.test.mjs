@@ -28,14 +28,23 @@ test("server-renders the market rotation dashboard", async () => {
 });
 
 test("ships the live snapshot route and removes the starter preview", async () => {
-  const [route, page, layout] = await Promise.all([
+  const [route, historyRoute, dashboard, equitySymbol, page, layout] = await Promise.all([
     readFile(new URL("../app/api/market/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/history/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/MarketDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/equity-symbol.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(route, /stocks\/snapshots/);
   assert.match(route, /APCA-API-KEY-ID/);
   assert.match(route, /provider: "demo"/);
+  assert.match(route, /requested === null \? bundledSymbols : requestedSymbols/);
+  assert.match(route, /if \(rateLimited\) break/);
+  assert.match(historyRoute, /Cache-Control": "public/);
+  assert.match(dashboard, /\.filter\(\(holding\) => isEquitySymbol\(holding\.symbol\)\)/);
+  assert.doesNotMatch(dashboard, /Object\.keys\(historyReturns\).*holding\.symbol/);
+  assert.match(equitySymbol, /\^\[A-Z\]\{1,5\}/);
   assert.match(page, /MarketDashboard/);
   assert.match(layout, /Sector Rotation Monitor/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));

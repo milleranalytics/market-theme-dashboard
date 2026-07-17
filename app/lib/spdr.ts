@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { isEquitySymbol } from "./equity-symbol";
 import type { EtfDefinition } from "../universe";
 
 export type NormalizedHolding = {
@@ -46,7 +47,7 @@ export function parseSpdrWorkbook(buffer: ArrayBuffer, fund: EtfDefinition): Hol
     const name = text(row[0]);
     const symbol = text(row[1]);
     const weight = number(row[4]);
-    if (!name || !symbol || weight === null || weight <= 0 || weight > 100) return [];
+    if (!name || !isEquitySymbol(symbol) || weight === null || weight <= 0 || weight > 100) return [];
     return [{
       name,
       symbol,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ import openpyxl
 SYMBOLS = ["XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"]
 URL = "https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-{symbol}.xlsx"
 OUTPUT = Path(__file__).parents[1] / "app" / "generated" / "spdr-holdings.json"
+EQUITY_SYMBOL = re.compile(r"^[A-Z]{1,5}(?:\.[A-Z])?$")
 
 
 def clean(value):
@@ -36,7 +38,7 @@ def refresh(symbol: str) -> dict:
     for row in rows[5:]:
         name, ticker, identifier, sedol, weight, sector, shares, currency = row[:8]
         ticker = clean(ticker)
-        if not name or not ticker or not isinstance(weight, (int, float)) or weight <= 0 or weight > 100:
+        if not name or not ticker or not EQUITY_SYMBOL.fullmatch(ticker) or not isinstance(weight, (int, float)) or weight <= 0 or weight > 100:
             continue
         holdings.append({
             "name": clean(name), "symbol": ticker, "identifier": clean(identifier),

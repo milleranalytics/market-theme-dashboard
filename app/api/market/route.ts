@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isEquitySymbol } from "../../lib/equity-symbol";
 import { getBundledHoldingsSnapshots } from "../../lib/holdings-snapshot";
 import { etfUniverse } from "../../universe";
 
@@ -24,20 +25,21 @@ export async function GET(request: Request) {
     });
   }
 
-  const requested = new URL(request.url).searchParams.get("symbols") ?? "";
-  const extraSymbols = requested
+  const requested = new URL(request.url).searchParams.get("symbols");
+  const requestedSymbols = (requested ?? "")
     .split(",")
     .map((symbol) => symbol.trim().toUpperCase())
-    .filter((symbol) => /^[A-Z0-9.\-]+$/.test(symbol));
+    .filter(isEquitySymbol);
   const bundledSnapshots = getBundledHoldingsSnapshots();
-  const symbols = Array.from(new Set([
+  const bundledSymbols = [
     ...etfUniverse.map((fund) => fund.symbol),
-    ...Object.values(bundledSnapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
-    ...extraSymbols,
-  ]));
+    ...Object.values(bundledSnapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter(isEquitySymbol)),
+  ];
+  const symbols = Array.from(new Set(requested === null ? bundledSymbols : requestedSymbols));
 
   const changes: Record<string, number> = {};
   const errors: Array<{ batch: number; status: number; code: string; symbols?: string[] }> = [];
+  let rateLimited = false;
   const batchSize = 100;
   const fetchBatch = async (batch: string[], batchNumber: number): Promise<void> => {
     const url = new URL("https://data.alpaca.markets/v2/stocks/snapshots");
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
         cache: "no-store",
       });
       if (!response.ok) {
+        if (response.status === 429) rateLimited = true;
         if (response.status === 400 && batch.length > 1) {
           const midpoint = Math.ceil(batch.length / 2);
           await fetchBatch(batch.slice(0, midpoint), batchNumber);
@@ -70,6 +73,7 @@ export async function GET(request: Request) {
   };
   for (let offset = 0; offset < symbols.length; offset += batchSize) {
     await fetchBatch(symbols.slice(offset, offset + batchSize), Math.floor(offset / batchSize) + 1);
+    if (rateLimited) break;
   }
   const provider = Object.keys(changes).length ? "alpaca" : "demo";
   return NextResponse.json({
@@ -78,6 +82,6 @@ export async function GET(request: Request) {
     reason: provider === "demo" ? errors[0]?.code ?? "alpaca_empty_response" : errors.length ? "alpaca_partial_response" : undefined,
     asOf: new Date().toISOString(),
     changes,
-    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors, holdingsDelivery: "bundled-baseline" },
-  });
+    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors, holdingsDelivery: requested === null ? "bundled-baseline" : "incremental" },
+  }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=90" } });
 }

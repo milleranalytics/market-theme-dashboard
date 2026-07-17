@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { marketGroups, periods, type MarketGroup, type PeriodKey } from "./data";
+import { isEquitySymbol } from "./lib/equity-symbol";
 import packageMetadata from "../package.json";
 
 type FilterKey = "All" | "Sector" | "Theme";
@@ -109,6 +110,8 @@ export function MarketDashboard() {
   const [rsScores, setRsScores] = useState<Record<string, number>>({});
   const [holdingsCache, setHoldingsCache] = useState<Record<string, HoldingsResponse>>({});
   const [additionalMarketSymbols, setAdditionalMarketSymbols] = useState<string[]>([]);
+  const [marketLoaded, setMarketLoaded] = useState(false);
+  const attemptedAdditionalSymbols = useRef(new Set<string>());
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [holdingsLoading, setHoldingsLoading] = useState(false);
   const [showAllHoldings, setShowAllHoldings] = useState(false);
@@ -117,15 +120,13 @@ export function MarketDashboard() {
     let active = true;
     const refresh = async () => {
       try {
-        const query = additionalMarketSymbols.length
-          ? `?symbols=${encodeURIComponent(additionalMarketSymbols.join(","))}`
-          : "";
-        const response = await fetch(`/api/market${query}`, { cache: "no-store" });
+        const response = await fetch("/api/market", { cache: "no-store" });
         if (!response.ok) return;
         const payload = (await response.json()) as LiveResponse;
         if (!active) return;
         setLiveChanges((current) => ({ ...current, ...(payload.changes ?? {}) }));
         setProvider(payload.provider);
+        if (payload.provider === "alpaca") setMarketLoaded(true);
         setFeed(payload.feed ?? payload.provider);
         setAsOf(payload.asOf);
         setMarketReason(payload.reason ?? null);
@@ -139,7 +140,20 @@ export function MarketDashboard() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [additionalMarketSymbols]);
+  }, []);
+
+  useEffect(() => {
+    if (!marketLoaded || provider !== "alpaca") return;
+    const missingSymbols = additionalMarketSymbols.filter((symbol) => liveChanges[symbol] === undefined && !attemptedAdditionalSymbols.current.has(symbol));
+    if (!missingSymbols.length) return;
+    missingSymbols.forEach((symbol) => attemptedAdditionalSymbols.current.add(symbol));
+    let active = true;
+    fetch(`/api/market?symbols=${encodeURIComponent(missingSymbols.join(","))}`, { cache: "no-store" })
+      .then(async (response) => { if (!response.ok) throw new Error("Incremental prices unavailable"); return response.json() as Promise<LiveResponse>; })
+      .then((payload) => { if (active && payload.provider === "alpaca") setLiveChanges((current) => ({ ...current, ...(payload.changes ?? {}) })); })
+      .catch(() => { /* The baseline prices and issuer holdings remain visible. */ });
+    return () => { active = false; };
+  }, [additionalMarketSymbols, liveChanges, marketLoaded, provider]);
 
   useEffect(() => {
     let active = true;
@@ -168,7 +182,7 @@ export function MarketDashboard() {
           setHoldingsCache((current) => ({ ...current, [selectedSymbol]: body }));
           setAdditionalMarketSymbols((current) => Array.from(new Set([
             ...current,
-            ...body.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol)),
+            ...body.holdings.map((holding) => holding.symbol).filter(isEquitySymbol),
           ])));
           setDisplayedSymbol(selectedSymbol);
         }
@@ -207,7 +221,7 @@ export function MarketDashboard() {
   const stockAdvancers = stockUniverse.filter((symbol) => returnFor(symbol, period)! > 0).length;
   const stockBreadth = stockUniverse.length ? (stockAdvancers / stockUniverse.length) * 100 : 0;
   const fullHoldings = issuerHoldings?.etf === selected.symbol ? issuerHoldings.holdings
-    .filter((holding) => holding.symbol && (Object.keys(historyReturns).length === 0 || historyReturns[holding.symbol] !== undefined || liveChanges[holding.symbol] !== undefined))
+    .filter((holding) => isEquitySymbol(holding.symbol))
     .map((holding) => {
     const holdingReturn = holding.symbol ? returnFor(holding.symbol, period) : undefined;
     return { ...holding, today: holdingReturn, rs: holding.symbol ? rsScores[holding.symbol] : undefined, contribution: holdingReturn === undefined ? undefined : holding.weight * holdingReturn / 100 };

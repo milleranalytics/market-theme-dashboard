@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isEquitySymbol } from "../../lib/equity-symbol";
 import { getLatestHoldingsSnapshots } from "../../lib/holdings-snapshot";
 import { etfUniverse } from "../../universe";
 
@@ -21,10 +22,11 @@ export async function GET() {
   const snapshotResult = await getLatestHoldingsSnapshots();
   const symbols = Array.from(new Set([
     ...etfUniverse.map((fund) => fund.symbol),
-    ...Object.values(snapshotResult.snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
+    ...Object.values(snapshotResult.snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter(isEquitySymbol)),
   ]));
   const barsBySymbol: Record<string, Bar[]> = {};
   const unsupported = new Set<string>();
+  let rateLimited = false;
   const start = new Date();
   start.setUTCDate(start.getUTCDate() - 430);
 
@@ -41,6 +43,7 @@ export async function GET() {
       if (pageToken) url.searchParams.set("page_token", pageToken);
       const response = await fetch(url, { headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret }, cache: "no-store" });
       if (!response.ok) {
+        if (response.status === 429) rateLimited = true;
         if (response.status === 400 && batch.length > 1) {
           const middle = Math.ceil(batch.length / 2);
           await fetchBatch(batch.slice(0, middle));
@@ -58,7 +61,10 @@ export async function GET() {
     } while (pageToken);
   };
 
-  for (let offset = 0; offset < symbols.length; offset += 75) await fetchBatch(symbols.slice(offset, offset + 75));
+  for (let offset = 0; offset < symbols.length; offset += 75) {
+    await fetchBatch(symbols.slice(offset, offset + 75));
+    if (rateLimited) break;
+  }
 
   const returns: Record<string, HistoryReturn> = {};
   const rawRs: Record<string, number> = {};
@@ -79,5 +85,5 @@ export async function GET() {
 
   return NextResponse.json({ provider: "alpaca", feed, asOf: new Date().toISOString(), returns, rs,
     diagnostics: { requestedSymbols: symbols.length, historySymbols: Object.keys(barsBySymbol).length, rsPopulation: scores.length, unsupportedSymbols: [...unsupported], holdingsDelivery: snapshotResult.delivery } },
-    { headers: { "Cache-Control": "private, max-age=0, s-maxage=21600, stale-while-revalidate=86400" } });
+    { headers: { "Cache-Control": "public, max-age=0, s-maxage=21600, stale-while-revalidate=86400" } });
 }

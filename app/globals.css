@@ -111,6 +111,9 @@ button { color: inherit; }
 .summary-card em { color: var(--muted); font-style: normal; font-size: 11px; margin-top: 6px; }
 .summary-card small { color: var(--dim); font-size: 9px; margin-top: 5px; }
 .summary-card b { margin-top: auto; font: 600 13px/1 var(--font-geist-mono), monospace; }
+.breadth-card-footer { display: flex; flex-direction: column; gap: 9px; margin-top: auto; padding-top: 14px; }
+.breadth-card-footer small { margin-top: 0; }
+.breadth-card-footer .mini-meter { margin-top: 0; }
 .leader-card b { color: var(--positive); }
 .laggard-card b { color: var(--negative); }
 .mini-meter { height: 4px; border-radius: 9px; background: #222b33; margin-top: auto; overflow: hidden; }

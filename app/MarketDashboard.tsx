@@ -259,12 +259,14 @@ export function MarketDashboard() {
             <em>{leader?.name}</em>
             <b>{leader ? formatPercent(valueFor(leader)) : "—"}</b>
           </article>
-          <article className="summary-card">
+          <article className="summary-card breadth-card">
             <span>Stock breadth · {periods.find((item) => item.key === period)?.label}</span>
             <strong>{stockUniverse.length ? `${Math.round(stockBreadth)}%` : "—"}</strong>
             <em>{stockUniverse.length ? `${stockAdvancers} of ${stockUniverse.length} stocks rising` : "Loading stock participation"}</em>
-            <small>{sectorAdvancers} of {ranked.length} sectors rising</small>
-            <div className="mini-meter"><i style={{ width: `${stockBreadth}%` }} /></div>
+            <div className="breadth-card-footer">
+              <div className="mini-meter" aria-label={`${Math.round(stockBreadth)}% of tracked stocks rising`}><i style={{ width: `${stockBreadth}%` }} /></div>
+              <small>{sectorAdvancers} of {ranked.length} sectors rising</small>
+            </div>
           </article>
           <article className="summary-card laggard-card">
             <span>Laggard</span>

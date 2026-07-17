@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLatestHoldingsSnapshots } from "../../lib/holdings-snapshot";
+import { getBundledHoldingsSnapshots } from "../../lib/holdings-snapshot";
 import { etfUniverse } from "../../universe";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ type Snapshot = {
   prevDailyBar?: { c?: number };
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const key = process.env.APCA_API_KEY_ID ?? process.env.ALPACA_API_KEY;
   const secret = process.env.APCA_API_SECRET_KEY ?? process.env.ALPACA_SECRET_KEY;
   const feed = process.env.ALPACA_FEED ?? "iex";
@@ -24,10 +24,16 @@ export async function GET() {
     });
   }
 
-  const snapshotResult = await getLatestHoldingsSnapshots();
+  const requested = new URL(request.url).searchParams.get("symbols") ?? "";
+  const extraSymbols = requested
+    .split(",")
+    .map((symbol) => symbol.trim().toUpperCase())
+    .filter((symbol) => /^[A-Z0-9.\-]+$/.test(symbol));
+  const bundledSnapshots = getBundledHoldingsSnapshots();
   const symbols = Array.from(new Set([
     ...etfUniverse.map((fund) => fund.symbol),
-    ...Object.values(snapshotResult.snapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
+    ...Object.values(bundledSnapshots).flatMap((snapshot) => snapshot.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol))),
+    ...extraSymbols,
   ]));
 
   const changes: Record<string, number> = {};
@@ -72,6 +78,6 @@ export async function GET() {
     reason: provider === "demo" ? errors[0]?.code ?? "alpaca_empty_response" : errors.length ? "alpaca_partial_response" : undefined,
     asOf: new Date().toISOString(),
     changes,
-    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors, holdingsDelivery: snapshotResult.delivery },
+    diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors, holdingsDelivery: "bundled-baseline" },
   });
 }

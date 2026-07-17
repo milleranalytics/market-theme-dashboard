@@ -108,6 +108,7 @@ export function MarketDashboard() {
   const [historyReturns, setHistoryReturns] = useState<HistoryResponse["returns"]>({});
   const [rsScores, setRsScores] = useState<Record<string, number>>({});
   const [holdingsCache, setHoldingsCache] = useState<Record<string, HoldingsResponse>>({});
+  const [additionalMarketSymbols, setAdditionalMarketSymbols] = useState<string[]>([]);
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [holdingsLoading, setHoldingsLoading] = useState(false);
   const [showAllHoldings, setShowAllHoldings] = useState(false);
@@ -116,11 +117,14 @@ export function MarketDashboard() {
     let active = true;
     const refresh = async () => {
       try {
-        const response = await fetch("/api/market", { cache: "no-store" });
+        const query = additionalMarketSymbols.length
+          ? `?symbols=${encodeURIComponent(additionalMarketSymbols.join(","))}`
+          : "";
+        const response = await fetch(`/api/market${query}`, { cache: "no-store" });
         if (!response.ok) return;
         const payload = (await response.json()) as LiveResponse;
         if (!active) return;
-        setLiveChanges(payload.changes ?? {});
+        setLiveChanges((current) => ({ ...current, ...(payload.changes ?? {}) }));
         setProvider(payload.provider);
         setFeed(payload.feed ?? payload.provider);
         setAsOf(payload.asOf);
@@ -135,7 +139,7 @@ export function MarketDashboard() {
       active = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [additionalMarketSymbols]);
 
   useEffect(() => {
     let active = true;
@@ -159,7 +163,16 @@ export function MarketDashboard() {
     setHoldingsLoading(true); setHoldingsError(null);
     fetch(`/api/holdings?symbol=${selectedSymbol}`, { cache: "no-store" })
       .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Holdings unavailable"); return body as HoldingsResponse; })
-      .then((body) => { if (active) { setHoldingsCache((current) => ({ ...current, [selectedSymbol]: body })); setDisplayedSymbol(selectedSymbol); } })
+      .then((body) => {
+        if (active) {
+          setHoldingsCache((current) => ({ ...current, [selectedSymbol]: body }));
+          setAdditionalMarketSymbols((current) => Array.from(new Set([
+            ...current,
+            ...body.holdings.map((holding) => holding.symbol).filter((symbol): symbol is string => Boolean(symbol)),
+          ])));
+          setDisplayedSymbol(selectedSymbol);
+        }
+      })
       .catch((error) => { if (active) setHoldingsError(error.message); })
       .finally(() => { if (active) setHoldingsLoading(false); });
     return () => { active = false; };

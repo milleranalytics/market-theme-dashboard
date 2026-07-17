@@ -55,6 +55,10 @@ function validateSnapshots(value: unknown): HoldingsSnapshotMap {
   return candidate;
 }
 
+export function getBundledHoldingsSnapshots(): HoldingsSnapshotMap {
+  return validateSnapshots(bundledSnapshots);
+}
+
 export async function getLatestHoldingsSnapshots(): Promise<SnapshotResult> {
   try {
     const response = await fetch(GITHUB_SNAPSHOT_URL, { cache: "no-store" });

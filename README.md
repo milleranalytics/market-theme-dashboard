@@ -14,7 +14,7 @@ The hosted app checks the GitHub holdings snapshot when it opens. If it cannot r
 
 ## Automated holdings refresh
 
-`.github/workflows/refresh-spdr-holdings.yml` runs at 23:30 UTC Monday through Friday (after the U.S. market closes) and can also be started manually. The workflow:
+`.github/workflows/refresh-spdr-holdings.yml` runs at 23:30 UTC Monday through Friday (after the U.S. market closes) and can also be started manually. It still checks all 11 issuer workbooks each run, but preserves the existing snapshot and creates no commit when holdings, weights, and effective dates are unchanged. The workflow:
 
 1. Downloads all 11 issuer workbooks.
 2. Keeps valid positive-weight holdings and normalizes their fields.

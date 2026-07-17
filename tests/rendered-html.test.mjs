@@ -42,10 +42,11 @@ test("ships the live snapshot route and removes the starter preview", async () =
 });
 
 test("keeps daily holdings diagnostics transparent but out of the data flow", async () => {
-  const [dashboard, snapshotSource, workflow] = await Promise.all([
+  const [dashboard, snapshotSource, workflow, refreshScript] = await Promise.all([
     readFile(new URL("../app/MarketDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/holdings-snapshot.ts", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/refresh-spdr-holdings.yml", import.meta.url), "utf8"),
+    readFile(new URL("../scripts/refresh_spdr_holdings.py", import.meta.url), "utf8"),
   ]);
   assert.match(snapshotSource, /cache: "no-store"/);
   assert.doesNotMatch(dashboard, /window\.setInterval\(refresh, 15 \* 60_000\)/);
@@ -55,4 +56,7 @@ test("keeps daily holdings diagnostics transparent but out of the data flow", as
   assert.doesNotMatch(dashboard, /<span>Updated \{formatTime\(asOf\)\}/);
   assert.doesNotMatch(workflow, /cron: "15 14 \* \* 1-5"/);
   assert.match(workflow, /cron: "30 23 \* \* 1-5"/);
+  assert.match(refreshScript, /def comparable\(snapshot: dict\)/);
+  assert.match(refreshScript, /if changed or not existing:/);
+  assert.match(refreshScript, /No holdings changes detected; leaving snapshot untouched/);
 });

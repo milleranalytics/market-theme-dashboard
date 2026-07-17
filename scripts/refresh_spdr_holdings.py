@@ -52,10 +52,39 @@ def refresh(symbol: str) -> dict:
             "delivery": "validated-snapshot"}
 
 
+def comparable(snapshot: dict) -> dict:
+    """Return the data fields that should trigger a committed snapshot change."""
+    return {key: value for key, value in snapshot.items() if key != "fetchedAt"}
+
+
+def load_existing() -> dict:
+    if not OUTPUT.exists():
+        return {}
+    try:
+        value = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def main() -> None:
-    snapshots = {symbol: refresh(symbol) for symbol in SYMBOLS}
+    fresh = {symbol: refresh(symbol) for symbol in SYMBOLS}
+    existing = load_existing()
+    snapshots = {}
+    changed = False
+    for symbol in SYMBOLS:
+        if symbol in existing and comparable(existing[symbol]) == comparable(fresh[symbol]):
+            # Preserve the prior retrieval time so an unchanged check produces no commit.
+            snapshots[symbol] = existing[symbol]
+        else:
+            snapshots[symbol] = fresh[symbol]
+            changed = True
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(json.dumps(snapshots, separators=(",", ":")), encoding="utf-8")
+    if changed or not existing:
+        OUTPUT.write_text(json.dumps(snapshots, separators=(",", ":")), encoding="utf-8")
+        print("Holdings changed; wrote normalized snapshot")
+    else:
+        print("No holdings changes detected; leaving snapshot untouched")
     print("Refreshed " + ", ".join(f"{symbol} ({len(data['holdings'])})" for symbol, data in snapshots.items()))
 
 

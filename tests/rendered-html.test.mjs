@@ -37,11 +37,18 @@ test("ships the live snapshot route and removes the starter preview", async () =
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(route, /stocks\/snapshots/);
+  assert.match(route, /ALPACA_SNAPSHOT_FEED \?\? "delayed_sip"/);
   assert.match(route, /APCA-API-KEY-ID/);
   assert.match(route, /provider: "demo"/);
   assert.match(route, /requested === null \? bundledSymbols : requestedSymbols/);
   assert.match(route, /if \(rateLimited\) break/);
   assert.match(historyRoute, /Cache-Control": "public/);
+  assert.match(historyRoute, /ALPACA_HISTORY_FEED \?\? "sip"/);
+  assert.match(historyRoute, /Date\.now\(\) - 15 \* 60_000/);
+  assert.match(historyRoute, /url\.searchParams\.set\("end", end\.toISOString\(\)\)/);
+  assert.doesNotMatch(`${route}\n${historyRoute}`, /process\.env\.ALPACA_FEED/);
+  assert.match(dashboard, /SIP · 15 min delayed/);
+  assert.doesNotMatch(dashboard, /Live via Alpaca/);
   assert.match(dashboard, /\.filter\(\(holding\) => isEquitySymbol\(holding\.symbol\)\)/);
   assert.doesNotMatch(dashboard, /Object\.keys\(historyReturns\).*holding\.symbol/);
   assert.match(equitySymbol, /\^\[A-Z\]\{1,5\}/);
@@ -59,7 +66,7 @@ test("keeps daily holdings diagnostics transparent but out of the data flow", as
   ]);
   assert.match(snapshotSource, /cache: "no-store"/);
   assert.doesNotMatch(dashboard, /window\.setInterval\(refresh, 15 \* 60_000\)/);
-  assert.match(dashboard, /Prices updated/);
+  assert.match(dashboard, /Market data through/);
   assert.match(dashboard, /<span>Updated<\/span><strong>\{formatCheckedTime\(issuerHoldings\?\.fetchedAt\)\}<\/strong>/);
   assert.ok(dashboard.indexOf('<div className="holdings-provenance">') > dashboard.indexOf('<div className="holdings-list">'));
   assert.doesNotMatch(dashboard, /<span>Updated \{formatTime\(asOf\)\}/);

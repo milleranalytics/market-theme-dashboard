@@ -234,6 +234,7 @@ export function MarketDashboard() {
   const fundAdvancingWeight = fundAdvancers.reduce((sum, holding) => sum + holding.weight, 0);
   const fundWeightBreadth = pricedWeight ? (fundAdvancingWeight / pricedWeight) * 100 : 0;
   const holdingsAge = businessDaysSince(issuerHoldings?.effectiveDate);
+  const marketFeedLabel = feed === "delayed_sip" ? "SIP · 15 min delayed" : feed.toUpperCase();
 
   return (
     <main className="app-shell">
@@ -247,7 +248,7 @@ export function MarketDashboard() {
         </div>
         <div className="status-block">
           <span className={`live-dot ${provider === "alpaca" ? "connected" : ""}`} />
-          <strong>{provider === "alpaca" ? `Live via Alpaca · ${feed.toUpperCase()}` : marketReason === "alpaca_credentials_missing" ? "Prices unavailable · Alpaca key required" : `Market data unavailable${marketReason?.startsWith("alpaca_http_") ? ` · HTTP ${marketReason.slice(12)}` : ""}`}</strong>
+          <strong>{provider === "alpaca" ? `Alpaca · ${marketFeedLabel}` : marketReason === "alpaca_credentials_missing" ? "Prices unavailable · Alpaca key required" : `Market data unavailable${marketReason?.startsWith("alpaca_http_") ? ` · HTTP ${marketReason.slice(12)}` : ""}`}</strong>
         </div>
       </header>
 
@@ -382,7 +383,7 @@ export function MarketDashboard() {
             <span>Method</span>
             <div>
               <p>Contribution equals current portfolio weight × selected-period return. RS is the 1–99 percentile of the weighted 3, 6, 9 and 12-month return formula across the tracked stock universe.</p>
-              <p className="data-debug">Prices updated {formatTime(asOf)} · refresh every 60 sec</p>
+              <p className="data-debug">Market data through {formatTime(asOf)} · snapshots refresh every 60 sec</p>
             </div>
           </div>
           <div className="holdings-provenance">
@@ -390,7 +391,7 @@ export function MarketDashboard() {
             <div><span>Effective</span><strong>{issuerHoldings?.effectiveDate ?? "—"}{holdingsAge > 2 ? " · stale" : ""}</strong></div>
             <div><span>Updated</span><strong>{formatCheckedTime(issuerHoldings?.fetchedAt)}</strong></div>
             <div><span>Priced weight</span><strong>{pricedWeight.toFixed(1)}%</strong></div>
-            <div><span>Analytics</span><strong>{provider === "alpaca" ? feed.toUpperCase() : "Not configured"}</strong></div>
+            <div><span>Analytics</span><strong>{provider === "alpaca" ? marketFeedLabel : "Not configured"}</strong></div>
           </div>
         </aside>
       </section>

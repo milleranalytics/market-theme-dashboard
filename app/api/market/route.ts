@@ -6,14 +6,15 @@ import { etfUniverse } from "../../universe";
 export const dynamic = "force-dynamic";
 
 type Snapshot = {
-  dailyBar?: { c?: number };
-  prevDailyBar?: { c?: number };
+  dailyBar?: { c?: number; t?: string };
+  prevDailyBar?: { c?: number; t?: string };
+  minuteBar?: { c?: number; t?: string };
 };
 
 export async function GET(request: Request) {
   const key = process.env.APCA_API_KEY_ID ?? process.env.ALPACA_API_KEY;
   const secret = process.env.APCA_API_SECRET_KEY ?? process.env.ALPACA_SECRET_KEY;
-  const feed = process.env.ALPACA_FEED ?? "iex";
+  const feed = process.env.ALPACA_SNAPSHOT_FEED ?? "delayed_sip";
 
   if (!key || !secret) {
     return NextResponse.json({
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
 
   const changes: Record<string, number> = {};
   const errors: Array<{ batch: number; status: number; code: string; symbols?: string[] }> = [];
+  let latestMarketTime = 0;
   let rateLimited = false;
   const batchSize = 100;
   const fetchBatch = async (batch: string[], batchNumber: number): Promise<void> => {
@@ -66,6 +68,8 @@ export async function GET(request: Request) {
         const current = snapshot.dailyBar?.c;
         const prior = snapshot.prevDailyBar?.c;
         if (current && prior) changes[symbol] = ((current / prior) - 1) * 100;
+        const marketTime = Date.parse(snapshot.minuteBar?.t ?? snapshot.dailyBar?.t ?? "");
+        if (Number.isFinite(marketTime)) latestMarketTime = Math.max(latestMarketTime, marketTime);
       }
     } catch {
       errors.push({ batch: batchNumber, status: 0, code: "alpaca_network_error", symbols: batch });
@@ -80,7 +84,7 @@ export async function GET(request: Request) {
     provider,
     feed: provider === "alpaca" ? feed : "demo",
     reason: provider === "demo" ? errors[0]?.code ?? "alpaca_empty_response" : errors.length ? "alpaca_partial_response" : undefined,
-    asOf: new Date().toISOString(),
+    asOf: latestMarketTime ? new Date(latestMarketTime).toISOString() : new Date().toISOString(),
     changes,
     diagnostics: { requestedSymbols: symbols.length, pricedSymbols: Object.keys(changes).length, failedBatches: errors, holdingsDelivery: requested === null ? "bundled-baseline" : "incremental" },
   }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=90" } });

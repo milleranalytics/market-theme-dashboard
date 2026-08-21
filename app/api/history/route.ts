@@ -16,7 +16,7 @@ const performance = (bars: Bar[], sessions: number) => {
 export async function GET() {
   const key = process.env.APCA_API_KEY_ID ?? process.env.ALPACA_API_KEY;
   const secret = process.env.APCA_API_SECRET_KEY ?? process.env.ALPACA_SECRET_KEY;
-  const feed = process.env.ALPACA_FEED ?? "iex";
+  const feed = process.env.ALPACA_HISTORY_FEED ?? "sip";
   if (!key || !secret) return NextResponse.json({ provider: "unavailable", reason: "alpaca_credentials_missing" }, { status: 503 });
 
   const snapshotResult = await getLatestHoldingsSnapshots();
@@ -29,6 +29,7 @@ export async function GET() {
   let rateLimited = false;
   const start = new Date();
   start.setUTCDate(start.getUTCDate() - 430);
+  const end = new Date(Date.now() - 15 * 60_000);
 
   const fetchBatch = async (batch: string[]): Promise<void> => {
     let pageToken: string | null = null;
@@ -37,6 +38,7 @@ export async function GET() {
       url.searchParams.set("symbols", batch.join(","));
       url.searchParams.set("timeframe", "1Day");
       url.searchParams.set("start", start.toISOString());
+      url.searchParams.set("end", end.toISOString());
       url.searchParams.set("adjustment", "all");
       url.searchParams.set("feed", feed);
       url.searchParams.set("limit", "10000");
@@ -83,7 +85,7 @@ export async function GET() {
   const rs: Record<string, number> = {};
   scores.forEach(([symbol], index) => { rs[symbol] = scores.length < 2 ? 50 : Math.round(1 + (index / (scores.length - 1)) * 98); });
 
-  return NextResponse.json({ provider: "alpaca", feed, asOf: new Date().toISOString(), returns, rs,
+  return NextResponse.json({ provider: "alpaca", feed, asOf: end.toISOString(), returns, rs,
     diagnostics: { requestedSymbols: symbols.length, historySymbols: Object.keys(barsBySymbol).length, rsPopulation: scores.length, unsupportedSymbols: [...unsupported], holdingsDelivery: snapshotResult.delivery } },
     { headers: { "Cache-Control": "public, max-age=0, s-maxage=21600, stale-while-revalidate=86400" } });
 }

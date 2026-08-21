@@ -19,7 +19,7 @@ export default function DataHealthPage() {
       <section className="health-grid">
         <article><span>Universe</span><strong>{etfUniverse.length}</strong><p>Select Sector SPDR ETFs</p></article>
         <article><span>Holdings source</span><strong>State Street</strong><p>Official workbooks refreshed by GitHub Actions</p></article>
-        <article><span>Price source</span><strong>Alpaca</strong><p>IEX by default; configured server-side</p></article>
+        <article><span>Price source</span><strong>Alpaca SIP</strong><p>Consolidated market data; Today is delayed 15 minutes</p></article>
       </section>
       <section className="source-panel">
         <div className="source-heading"><div><p>Holdings ingestion</p><h2>Automated snapshot</h2></div><span>Weekdays · after close</span></div>
